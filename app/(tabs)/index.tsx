@@ -10,12 +10,14 @@ import {
   ScrollView,
 } from "react-native";
 import { Fontisto } from "@expo/vector-icons";
+import CheckBox from "react-native-check-box";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { theme } from "./colors";
 
 interface ToDo {
   text: string;
   working: boolean;
+  isSelected: boolean;
 }
 
 const STORGE_KEY = "@toDos";
@@ -25,6 +27,7 @@ export default function App() {
   const [working, setWorking] = useState(true);
   const [text, setText] = useState("");
   const [toDos, setToDos] = useState<{ [key: string]: ToDo }>({});
+  const [isSelected, setSelection] = useState(false);
 
   //App実行した時、状態を呼び出す。
   useEffect(() => {
@@ -48,6 +51,7 @@ export default function App() {
     await AsyncStorage.setItem(STORGE_KEY, JSON.stringify(toSave));
   };
 
+  // 状態が変更になるたび、データを保存。
   const saveWorking = async (value: boolean) => {
     try {
       await AsyncStorage.setItem(WORKING_KEY, JSON.stringify(value));
@@ -56,6 +60,7 @@ export default function App() {
     }
   };
 
+  // 削除
   const deleteToDo = (key: string) => {
     Alert.alert("Delete To Do", "Are you sure?", [
       { text: "Cancel" },
@@ -94,19 +99,35 @@ export default function App() {
     }
   };
 
+  // 追加
   const addToDo = async () => {
     if (text === "") {
       return;
     }
-
+    const isSelected = false;
     const newToDos = {
       ...toDos,
-      [Date.now()]: { text, working },
+      [Date.now()]: { text, working, isSelected },
     };
+
     console.log(newToDos);
     setToDos(newToDos);
     await saveToDos(newToDos);
     setText("");
+  };
+
+  //　チェエク状態保存
+  const handleCheck = (key: string) => {
+    const newToDos = {
+      ...toDos,
+      [key]: {
+        ...toDos[key],
+        isSelected: !toDos[key].isSelected,
+      },
+    };
+    console.log(newToDos);
+    setToDos(newToDos);
+    saveToDos(newToDos);
   };
 
   return (
@@ -143,10 +164,27 @@ export default function App() {
         {Object.keys(toDos).map((key) =>
           toDos[key].working === working ? (
             <View style={styles.toDo} key={key}>
-              <Text style={styles.toDoText}>{toDos[key].text}</Text>
-              <TouchableOpacity onPress={() => deleteToDo(key)}>
-                <Fontisto name="trash" size={18} color={theme.grey} />
-              </TouchableOpacity>
+              <Text
+                style={[
+                  styles.toDoText,
+                  toDos[key].isSelected ? styles.strikeThrough : null,
+                ]}
+              >
+                {toDos[key].text}
+              </Text>
+              <View style={styles.selectContainer}>
+                <View style={styles.checkboxContainer}>
+                  <CheckBox
+                    isChecked={toDos[key].isSelected}
+                    onClick={() => handleCheck(key)}
+                    style={styles.checkbox}
+                    checkBoxColor={theme.grey}
+                  />
+                </View>
+                <TouchableOpacity onPress={() => deleteToDo(key)}>
+                  <Fontisto name="trash" size={18} color={theme.grey} />
+                </TouchableOpacity>
+              </View>
             </View>
           ) : null
         )}
@@ -188,5 +226,20 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: 16,
     fontWeight: "600",
+  },
+  strikeThrough: {
+    textDecorationLine: "line-through",
+    color: "#999999",
+  },
+  checkboxContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginRight: 10,
+  },
+  checkbox: {
+    alignSelf: "center",
+  },
+  selectContainer: {
+    flexDirection: "row",
   },
 });
