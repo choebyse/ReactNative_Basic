@@ -8,16 +8,20 @@ import {
   TextInput,
   Alert,
   ScrollView,
+  Modal,
+  Button,
 } from "react-native";
 import { Fontisto } from "@expo/vector-icons";
 import CheckBox from "react-native-check-box";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import Feather from "@expo/vector-icons/Feather";
 import { theme } from "./colors";
 
 interface ToDo {
   text: string;
   working: boolean;
   isSelected: boolean;
+  selectedTodo: string;
 }
 
 const STORGE_KEY = "@toDos";
@@ -27,12 +31,17 @@ export default function App() {
   const [working, setWorking] = useState(true);
   const [text, setText] = useState("");
   const [toDos, setToDos] = useState<{ [key: string]: ToDo }>({});
-  const [isSelected, setSelection] = useState(false);
+  const [selectedTodo, setSelectedTodo] = useState<string | null>(null);
+  const [editedText, setEditedText] = useState("");
+  const [modalVisible, setModalVisible] = useState(false);
 
   //App実行した時、状態を呼び出す。
   useEffect(() => {
-    loadWorking();
-    loadToDos();
+    const fetchData = async () => {
+      await loadWorking();
+      await loadToDos();
+    };
+    fetchData();
   }, []);
 
   const travel = () => {
@@ -77,6 +86,29 @@ export default function App() {
     ]);
   };
 
+  //　修正
+  const editToDo = (key: string) => {
+    setSelectedTodo(key);
+    setEditedText(toDos[key].text);
+    setModalVisible(true);
+  };
+
+  const saveEditedTodo = () => {
+    if (selectedTodo !== null) {
+      const newToDos = {
+        ...toDos,
+        [selectedTodo]: { ...toDos[selectedTodo], text: editedText },
+      };
+      setToDos(newToDos);
+      setModalVisible(false);
+    }
+  };
+
+  const cancelEdit = () => {
+    setModalVisible(false);
+    setEditedText(""); // 입력한 내용을 초기화
+  };
+
   //　Appが実行した時、保存したデータを呼び出す。
   const loadToDos = async () => {
     const s: string | null = await AsyncStorage.getItem(STORGE_KEY);
@@ -101,7 +133,8 @@ export default function App() {
 
   // 追加
   const addToDo = async () => {
-    if (text === "") {
+    if (!text.trim()) {
+      Alert.alert("Error", "Please enter a valid To Do item");
       return;
     }
     const isSelected = false;
@@ -161,17 +194,52 @@ export default function App() {
         style={styles.input}
       />
       <ScrollView>
-        {Object.keys(toDos).map((key) =>
-          toDos[key].working === working ? (
+        {Object.keys(toDos)
+          .filter((key) => toDos[key].working === working)
+          .map((key) => (
             <View style={styles.toDo} key={key}>
-              <Text
-                style={[
-                  styles.toDoText,
-                  toDos[key].isSelected ? styles.strikeThrough : null,
-                ]}
+              <View style={styles.textContainer}>
+                <Text
+                  style={[
+                    styles.toDoText,
+                    toDos[key].isSelected ? styles.strikeThrough : null,
+                  ]}
+                >
+                  {toDos[key].text}
+                </Text>
+
+                <TouchableOpacity
+                  style={styles.editContainer}
+                  onPress={() => editToDo(key)}
+                >
+                  <Feather name="edit" size={18} color={theme.grey} />
+                </TouchableOpacity>
+              </View>
+
+              <Modal
+                visible={modalVisible}
+                transparent={true}
+                animationType="slide"
               >
-                {toDos[key].text}
-              </Text>
+                <View
+                  style={{
+                    margin: 50,
+                    padding: 40,
+                    backgroundColor: "white",
+                    borderRadius: 10,
+                  }}
+                >
+                  <Text>Edit To Do</Text>
+                  <TextInput
+                    style={{ borderBottomWidth: 1, marginBottom: 20 }}
+                    value={editedText}
+                    onChangeText={setEditedText}
+                  />
+                  <Button title="Save" onPress={saveEditedTodo} />
+                  <Button title="Cancle" onPress={cancelEdit} />
+                </View>
+              </Modal>
+
               <View style={styles.selectContainer}>
                 <View style={styles.checkboxContainer}>
                   <CheckBox
@@ -181,13 +249,13 @@ export default function App() {
                     checkBoxColor={theme.grey}
                   />
                 </View>
+
                 <TouchableOpacity onPress={() => deleteToDo(key)}>
                   <Fontisto name="trash" size={18} color={theme.grey} />
                 </TouchableOpacity>
               </View>
             </View>
-          ) : null
-        )}
+          ))}
       </ScrollView>
     </View>
   );
@@ -229,6 +297,7 @@ const styles = StyleSheet.create({
   },
   strikeThrough: {
     textDecorationLine: "line-through",
+    textDecorationStyle: "double",
     color: "#999999",
   },
   checkboxContainer: {
@@ -241,5 +310,11 @@ const styles = StyleSheet.create({
   },
   selectContainer: {
     flexDirection: "row",
+  },
+  textContainer: {
+    flexDirection: "row",
+  },
+  editContainer: {
+    paddingHorizontal: 10,
   },
 });
